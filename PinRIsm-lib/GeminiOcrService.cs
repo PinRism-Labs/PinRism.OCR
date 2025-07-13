@@ -21,7 +21,7 @@ namespace PinRism.Lib
             _geminiApiKey = configuration["GeminiApiKey"] ??
                             throw new InvalidOperationException("GeminiApiKey is not configured add a appsettings.json and use the api key from gemini studio website.");
 
-            _geminiApiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_geminiApiKey}";
+            _geminiApiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
             _logger.LogInformation("GeminiOcrService initialized with API URL: {ApiUrl}", _geminiApiUrl);
         }
@@ -60,7 +60,14 @@ namespace PinRism.Lib
 
                 _logger.LogInformation("Sending request to Gemini API for text extraction. Image MIME Type: {MimeType}", mimeType);
 
-                var response = await _httpClient.PostAsJsonAsync(_geminiApiUrl, requestPayload);
+                var request = new HttpRequestMessage(HttpMethod.Post, _geminiApiUrl)
+                {
+                    Content = JsonContent.Create(requestPayload)
+                };
+
+                request.Headers.Add("x-goog-api-key", _geminiApiKey);
+
+                var response = await _httpClient.SendAsync(request);
 
                 response.EnsureSuccessStatusCode();
 
