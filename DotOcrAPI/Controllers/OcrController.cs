@@ -3,6 +3,7 @@ using PinRism.Lib;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using PinRism.Lib.Models.DTOs;
 
 namespace DotOcrAPI.Controllers
 {
@@ -21,7 +22,6 @@ namespace DotOcrAPI.Controllers
 
         [HttpPost("extract-text")]
         [Consumes("multipart/form-data")]
-        [Produces("text/plain")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(string))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -39,6 +39,8 @@ namespace DotOcrAPI.Controllers
                 return BadRequest("Unsupported file type. Please upload an image (e.g., JPEG, PNG).");
             }
 
+            OcrResultDto resultDto = new OcrResultDto(); 
+
             try
             {
                 using var memoryStream = new MemoryStream();
@@ -48,20 +50,33 @@ namespace DotOcrAPI.Controllers
                 _logger.LogInformation("Received image file: {FileName}, Size: {Length} bytes, Type: {ContentType}",
                                        file.FileName, file.Length, file.ContentType);
 
+
+                resultDto .Meta.FileName = file.FileName;
+                resultDto.Meta.Length = imageData.Length;
+                resultDto.Meta.MimeType = file.ContentType;
+
                 string extractedText = await _ocrService.ExtractTextFromImageAsync(imageData, file.ContentType);
 
                 if (string.IsNullOrEmpty(extractedText))
                 {
                     _logger.LogInformation("Text extraction completed, but no text was found for file: {FileName}", file.FileName);
-                    return Ok("No text found in the image.");
+
+                    resultDto.Success = false;
+                    resultDto.Error = "No text found in the image.";
+                    return Ok(resultDto);
                 }
 
                 _logger.LogInformation("Text successfully extracted from file: {FileName}", file.FileName);
-                return Ok(extractedText);
+
+                resultDto.Success = true;
+                resultDto.Data.RawText = extractedText;
+
+                return Ok(resultDto);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred while processing the image for text extraction.");
+
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred during text extraction.");
             }
         }
